@@ -27,7 +27,7 @@ $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine")
 
 # Logging vars
 $logtag = "powershell-test-script"
-$logfile = "env:log_directory\$logtag.log"
+$logfile = "$env:log_directory\$logtag.log"
 
 # Default testEndState is pass
 $defaultTestEndState = "pass"
@@ -49,46 +49,53 @@ function logger($level, $logstring) {
 new-item $LOGFILE -itemType file -force
 start-transcript -append -path $LOGFILE
 logInfo "Running $LOGTAG..."
+Get-ChildItem Env: | Out-File C:\log\environment.log
 
 try {
     logInfo "Running the sample test.ps1 Powershell test script..."
 
     $testEndStateValue = $defaultTestEndState
 
+    if (!$env:DEPLOYMENT_PROPERTIES_FILE) {
+        $errMsg = "Environment variable not found: DEPLOYMENT_PROPERTIES_FILE"
+        logErr $errMsg
+        throw $errMsg
+    }
+
     # Ensure the deployment properties file exists
-    if (test-path $env:DEPLOYMENT_PROPERTIES_FILE) {
-        logInfo "Found deployment properties file: $env:DEPLOYMENT_PROPERTIES_FILE"
+    if (-not (test-path $env:DEPLOYMENT_PROPERTIES_FILE)) {
+        $errMsg = "Deployment properties file not found: $env:DEPLOYMENT_PROPERTIES_FILE"
+        logErr $errMsg
+        throw $errMsg
+    }  
+    logInfo "Found deployment properties file: $env:DEPLOYMENT_PROPERTIES_FILE"
 
-        # Check for testEndState custom property
-        $testEndState = gc $env:DEPLOYMENT_PROPERTIES_FILE | select-string "testEndState"
+    # Check for testEndState custom property
+    $testEndState = gc $env:DEPLOYMENT_PROPERTIES_FILE | select-string "testEndState"
 
-        # Check what was found (or not found) in the props file
-        if (!$testEndState) {
-            logInfo "Custom property not found for testEndState, using default: $defaultTestEndState"
-        }
-        else {
-            # Use the default if more than 1 value was found
-            if ($testEndState.length -ne 1) {
-                logWarn "More than one value for testEndState found, using default: $defaultTestEndState"
-            }
-            else {
-                logInfo "Found testEndState property: $testEndState"
-                
-                # Use the default if the prop is malformed
-                if ($testEndState.split("=").length -ne 2) {
-                    logWarn "Found malformed custom property with more than 1 equals sign: $testEndState, using default: $defaultTestEndState"
-                }
-                else {
-                    # Use the prop value
-                    $prop,$value = $testEndState.split("=")
-                    logInfo "Found property $prop, and value $value"
-                    $testEndStateValue = $value.toLower()
-                }
-            }
-        }
+    # Check what was found (or not found) in the props file
+    if (!$testEndState) {
+        logInfo "Custom property not found for testEndState, using default: $defaultTestEndState"
     }
     else {
-        logWarn "Deployment properties file not found: $env:DEPLOYMENT_PROPERTIES_FILE"
+        # Use the default if more than 1 value was found
+        if ($testEndState.length -ne 1) {
+            logWarn "More than one value for testEndState found, using default: $defaultTestEndState"
+        }
+        else {
+            logInfo "Found testEndState property: $testEndState"
+            
+            # Use the default if the prop is malformed
+            if ("$testEndState".split("=").length -ne 2) {
+                logWarn "Found malformed custom property with more than 1 equals sign: $testEndState, using default: $defaultTestEndState"
+            }
+            else {
+                # Use the prop value
+                $prop,$value = "$testEndState".split("=")
+                logInfo "Found property $prop, and value $value"
+                $testEndStateValue = $value.toLower()
+            }
+        }
     }
     
     logInfo "Using testEndState value = $testEndStateValue"
@@ -142,5 +149,4 @@ finally {
 
 logInfo "Exiting with code: $exitCode"
 stop-transcript
-get-content -Path $logfile
 exit $exitCode
