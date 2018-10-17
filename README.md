@@ -1,6 +1,10 @@
 # test-asset-powershell
 
-Sample Powershell script test asset for CONS3RT.
+Sample Powershell script test asset for CONS3RT. Create your own 
+Powershell test script to execute a test and provide easily 
+downloadable results.
+
+> Runs Windows 10 Powershell v5.1
 
 To use this sample:
 
